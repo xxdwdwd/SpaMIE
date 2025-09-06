@@ -61,8 +61,6 @@ def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CIT
       # Protein
       adata_omics2 = clr_normalize_each_cell(adata_omics2)
       adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=32)
-
- 
       
     elif datatype == 'Spatial-epigenome-transcriptome-RNA-ATAC':  
         # RNA
@@ -108,8 +106,6 @@ def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CIT
         else:
             adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=64)
            
-
-
 
     elif datatype == 'simu':
         n_comps = 40
@@ -239,7 +235,7 @@ def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CIT
 
     # construct spatial neighbor graphs
     ################# spatial graph #################
-    if datatype in ['Stereo-CITE-seq', 'Spatial-epigenome-transcriptome','spots','mouseEmbryo']:
+    if datatype in ['Stereo-CITE-seq', 'simu', 'Spatial-epigenome-transcriptome','spots','mouseEmbryo']:
        n_neighbors = 6 
     if datatype in ['spots']:
        n_neighbors = 7
