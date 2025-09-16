@@ -4,7 +4,7 @@ import torch as th
 from SpaMIE.preprocess import preprocessing
 
 
-def Sagegraph(modalities, device, datatype='Stereo-CITE-seq', batch=False):
+def Sagegraph(modalities, device, task="prediction", test_idx_name=None, y_pred_name=None, pred_joint=False, datatype='Stereo-CITE-seq', batch=False):
 
     adata_omics1 = modalities[0]
     adata_omics2 = modalities[1]
@@ -13,7 +13,8 @@ def Sagegraph(modalities, device, datatype='Stereo-CITE-seq', batch=False):
     adata_omics2.var_names_make_unique()
 
     # construct dgl graphs
-    data = preprocessing(adata_omics1, adata_omics2, datatype=datatype, batch=batch)
+    data = preprocessing(adata_omics1, adata_omics2, task, test_idx_name, 
+                         y_pred_name, pred_joint=pred_joint, datatype=datatype, batch=batch)
     adata_omics1 = data['adata_omics1']
     adata_omics2 = data['adata_omics2']
 

@@ -15,7 +15,8 @@ from scipy.sparse import coo_matrix
 from sklearn.neighbors import NearestNeighbors
 from sklearn.neighbors import kneighbors_graph 
     
-def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CITE-seq', n_neighbors=3):
+def preprocessing(adata_omics1, adata_omics2, task, test_idx_name, y_pred_name, 
+                  pred_joint=False,  batch=False, datatype='Stereo-CITE-seq', n_neighbors=3):
     
     # configure random seed
     random_seed=2024
@@ -24,75 +25,66 @@ def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CIT
     if datatype not in ['Stereo-CITE-seq','Stereo-CITE-seq_rna', 'Spatial_RNA_Epigenome','Spatial_Epigenome_RNA', 'mouseEmbryo', 'Spatial-epigenome-transcriptome-RNA-ATAC', 'Spatial-epigenome-transcriptome-ATAC-RNA', 'simu', 'spots']:
       raise ValueError("The datatype is not supported now. SAGE supports 'Stereo-CITE-seq', 'Spatial-ATAC-RNA-seq'. We would extend SpatialGlue for more data types. ") 
      
-      
-    if datatype == 'Stereo-CITE-seq':  
-      # RNA
-      sc.pp.filter_genes(adata_omics1, min_cells=0)
-      sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
-      
-      sc.pp.filter_genes(adata_omics2, min_cells=0)
-      adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
-  
-      sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
-      sc.pp.normalize_total(adata_omics1, target_sum=1e4)
-      sc.pp.log1p(adata_omics1)
-      if batch:
-            sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=adata_omics2.n_vars-1)
-            sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
-      else: 
+    if task =='Prediction':
+        if datatype == 'Stereo-CITE-seq':  
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=0)
+            sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
             adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-            adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=32)# adata_omics2.n_vars-1
 
-      # Protein
-      adata_omics2 = clr_normalize_each_cell(adata_omics2)
-      adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=adata_omics2.n_vars-1)
+            # ADT
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
 
-    if datatype == 'Stereo-CITE-seq_rna':  
-      # RNA
-      sc.pp.filter_genes(adata_omics1, min_cells=0)
-      sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
-      
-      sc.pp.filter_genes(adata_omics2, min_cells=0)
-      adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=adata_omics2.n_vars-1)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=32)# adata_omics2.n_vars-1
 
-      adata_omics1 = clr_normalize_each_cell(adata_omics1)
-      adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=16)# adata_omics2.n_vars-1
+            # Protein
+            adata_omics2 = clr_normalize_each_cell(adata_omics2)
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=adata_omics2.n_vars-1)
 
-      # Protein
-      adata_omics2 = clr_normalize_each_cell(adata_omics2)
-      adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=32)
-      
-    elif datatype == 'Spatial-epigenome-transcriptome-RNA-ATAC':  
-        # RNA
-        sc.pp.filter_genes(adata_omics1, min_cells=10)
-        sc.pp.filter_cells(adata_omics1, min_genes=10)
-        adata_omics1.X = adata_omics1.X.toarray()
+        
+        elif datatype == 'Spatial-epigenome-transcriptome-RNA-ATAC':  
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10)
+            adata_omics1.X = adata_omics1.X.toarray()
 
-        sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
-        sc.pp.normalize_total(adata_omics1, target_sum=1e4)
-        sc.pp.log1p(adata_omics1)
-        adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-        adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
-        adata_omics1 = adata_omics1[:, adata_omics1.var['highly_variable']]
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
 
-        # ATAC
-        adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
-        sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
-        adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
-        adata_omics2.X = adata_omics2.X.toarray()
-        adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=256)
-    
-    elif datatype == 'Spatial-epigenome-transcriptome-ATAC-RNA':  
-        # ATAC
-        sc.pp.filter_genes(adata_omics1, min_cells=5)
-        sc.pp.filter_genes(adata_omics1, max_cells=adata_omics1.X.shape[1]/2)
-        adata_omics1.X = adata_omics1.X.toarray()
+            # ATAC
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
+            adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
+            adata_omics2.X = adata_omics2.X.toarray()
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=256)
+            
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
 
 
-        adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=256)
 
-        # RNA
-        if batch: ## truth pred
+        elif datatype == 'Spatial-epigenome-transcriptome-ATAC-RNA':  
+
+            # ATAC
+            sc.pp.filter_genes(adata_omics1, min_cells=5)
+            sc.pp.filter_genes(adata_omics1, max_cells=adata_omics1.X.shape[1]/2)
+            adata_omics1.X = adata_omics1.X.toarray()
+
+            # RNA
+
             adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
             sc.pp.filter_genes(adata_omics2, min_cells=10)
             sc.pp.filter_cells(adata_omics2, min_genes=10)
@@ -103,132 +95,334 @@ def preprocessing(adata_omics1, adata_omics2,  batch=False, datatype='Stereo-CIT
             adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
             adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
             adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
-        else:
-            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=64)
-           
 
-    elif datatype == 'simu':
-        n_comps = 40
-        if batch:
-            sc.pp.pca(adata_omics1, use_highly_variable=False, n_comps=n_comps)
-            sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
-        else: 
-            adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=n_comps)# adata_omics2.n_vars-1
-
-        # sc.pp.scale(adata_omics2)
-        adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=n_comps)
-    
-    elif datatype == 'Spatial_RNA_Epigenome':
-        # RNA
-      sc.pp.filter_genes(adata_omics1, min_cells=10)
-      sc.pp.filter_cells(adata_omics1, min_genes=10)  # mouse tonsil 80
-      
-      sc.pp.filter_genes(adata_omics2, min_cells=0)
-      adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
-
-            
-      sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
-      sc.pp.normalize_total(adata_omics1, target_sum=1e4)
-      sc.pp.log1p(adata_omics1)
-      
-      adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-      adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
-
-      # Epigenome
-      sc.pp.highly_variable_genes(adata_omics2, flavor="seurat", n_top_genes=3000)
-      adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
-      adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=256)
-      adata_omics2 =  adata_omics2[:, adata_omics2.var['highly_variable']]
-
-    elif datatype == 'Spatial_Epigenome_RNA':
-      
-    # Epigenome
-      sc.pp.filter_genes(adata_omics1, min_cells=10)
-      sc.pp.filter_cells(adata_omics1, min_genes=10) 
-      sc.pp.highly_variable_genes(adata_omics1, flavor="seurat", n_top_genes=3000)
-      adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-
-    # RNA 
-      sc.pp.filter_genes(adata_omics2, min_cells=10)
-      sc.pp.filter_genes(adata_omics2, min_cells=0)
-      adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
-
-
-      if batch:
-            sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
-            sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
-            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=2)# adata_omics2.n_vars-1
-
-      else: 
-            # adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-            adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
-            
-            # sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
-            sc.pp.normalize_total(adata_omics2, target_sum=1e4)
-            sc.pp.log1p(adata_omics2)
-            # adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
-            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=2)# adata_omics2.n_vars-1
-            # adata_omics2 =  adata_omics2[:, adata_omics2.var['highly_variable']]
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
 
 
 
-    elif datatype == 'spots':
-        # RNA
+        elif datatype == 'simu':
+            n_comps = 40
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=False, n_comps=n_comps)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=n_comps)# adata_omics2.n_vars-1
 
-        sc.pp.filter_genes(adata_omics1, min_cells=10)
-        sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
-        sc.pp.filter_genes(adata_omics2, min_cells=0)
-        adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
-
-        sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
-        sc.pp.normalize_total(adata_omics1, target_sum=1e4)
-        sc.pp.log1p(adata_omics1)
-
-        if batch:
-            sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=32)#32
-            sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
-        else: 
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=n_comps)
+        
+        elif datatype == 'Spatial_RNA_Epigenome':
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
             adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
-            adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=adata_omics2.n_vars-1)# adata_omics2.n_vars-1
-
-        adata_omics2 = clr_normalize_each_cell(adata_omics2)
-        adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=adata_omics2.n_vars-1)
-
-    elif datatype == 'mouseEmbryo':
-        # ATAC
-        sc.pp.filter_genes(adata_omics1, min_cells=5)
-        sc.pp.filter_genes(adata_omics1, max_cells=adata_omics1.X.shape[1]/2) # mouse tonsil 80
-
-        adata_omics1.X = adata_omics1.X.toarray()
-
-
-        if batch:
-            sc.pp.pca(adata_omics1, use_highly_variable=False, n_comps=256)
-            sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
-        else: 
+            # Epigenome
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
             
-            adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=256)# adata_omics2.n_vars-1
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
 
-        # RNA
-        sc.pp.filter_genes(adata_omics2, min_cells=5)
-        sc.pp.filter_cells(adata_omics2, min_genes=0)
-        adata_omics2.X = adata_omics2.X.toarray()
-        sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
-        if batch:
+            # Epigenome
+            sc.pp.highly_variable_genes(adata_omics2, flavor="seurat", n_top_genes=3000)
+            adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=256)
+            adata_omics2 =  adata_omics2[:, adata_omics2.var['highly_variable']]
+
+        elif datatype == 'Spatial_Epigenome_RNA':
+            
+            # Epigenome
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10) 
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat", n_top_genes=3000)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+
+            # RNA 
+            sc.pp.filter_genes(adata_omics2, min_cells=10)
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+
+            if batch:
+                    sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                    sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                    adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
+
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=2)# adata_omics2.n_vars-1
+
+        elif datatype == 'spots':
+
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            
+            # ADT
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=32)#32
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=adata_omics2.n_vars-1)# adata_omics2.n_vars-1
+
+            adata_omics2 = clr_normalize_each_cell(adata_omics2)
+            adata_omics2.obsm['feat'] = pca(adata_omics2, n_comps=adata_omics2.n_vars-1)
+
+    if task =='Integration':
+        if datatype == 'Stereo-CITE-seq':  
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=0)
+            sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+
+            # ADT
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            adata_omics2 = clr_normalize_each_cell(adata_omics2)
+
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=adata_omics2.n_vars-1)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=32)# adata_omics2.n_vars-1
+
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=adata_omics2.n_vars-1)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=32)
+
+
+        
+        elif datatype == 'Spatial-epigenome-transcriptome-RNA-ATAC':  
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10)
+            adata_omics1.X = adata_omics1.X.toarray()
+
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+
+            # ATAC
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
+            adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
+            adata_omics2.X = adata_omics2.X.toarray()
+            
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
+
+
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
+
+
+        elif datatype == 'Spatial-epigenome-transcriptome-ATAC-RNA':  
+
+            # ATAC
+            sc.pp.filter_genes(adata_omics1, min_cells=5)
+            sc.pp.filter_genes(adata_omics1, max_cells=adata_omics1.X.shape[1]/2)
+            adata_omics1.X = adata_omics1.X.toarray()
+
+            # RNA
+
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            sc.pp.filter_genes(adata_omics2, min_cells=10)
+            sc.pp.filter_cells(adata_omics2, min_genes=10)
+            adata_omics2.X = adata_omics2.X ##toarrary()
+            sc.pp.highly_variable_genes(adata_omics2, flavor="seurat_v3", n_top_genes=3000)
             sc.pp.normalize_total(adata_omics2, target_sum=1e4)
             sc.pp.log1p(adata_omics2)
             adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
-            adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
-            adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
-        else:
-            sc.pp.normalize_total(adata_omics2, target_sum=1e4)
-            sc.pp.log1p(adata_omics2)
-            adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
-            adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
-            adata_omics2 = adata_omics2[:, adata_omics2.var['highly_variable']]
-            
+
+
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
 
             
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)
+
+
+
+
+        elif datatype == 'simu':
+            n_comps = 40
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=False, n_comps=n_comps)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1, n_comps=n_comps)# adata_omics2.n_vars-1
+
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=n_comps)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=n_comps)
+
+        
+        elif datatype == 'Spatial_RNA_Epigenome':
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+            # Epigenome
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+            
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else:
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
+
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                sc.pp.highly_variable_genes(adata_omics2, flavor="seurat", n_top_genes=3000)
+                adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
+                adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
+
+
+
+
+        elif datatype == 'Spatial_Epigenome_RNA':
+            
+            # Epigenome
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=10) 
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat", n_top_genes=3000)
+            adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+
+            # RNA 
+            sc.pp.filter_genes(adata_omics2, min_cells=10)
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=256)# adata_omics2.n_vars-1
+
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                sc.pp.highly_variable_genes(adata_omics2, flavor="seurat", n_top_genes=3000)
+                adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
+                adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
+
+
+        elif datatype == 'spots':
+
+            # RNA
+            sc.pp.filter_genes(adata_omics1, min_cells=10)
+            sc.pp.filter_cells(adata_omics1, min_genes=0)  # mouse tonsil 80
+            sc.pp.highly_variable_genes(adata_omics1, flavor="seurat_v3", n_top_genes=3000)
+            sc.pp.normalize_total(adata_omics1, target_sum=1e4)
+            sc.pp.log1p(adata_omics1)
+            
+            # ADT
+            adata_omics2 = clr_normalize_each_cell(adata_omics2)
+            sc.pp.filter_genes(adata_omics2, min_cells=0)
+            adata_omics2 = adata_omics2[adata_omics1.obs_names].copy()
+
+            if batch:
+                sc.pp.pca(adata_omics1, use_highly_variable=True, n_comps=32)#32
+                sc.external.pp.harmony_integrate(adata_omics1, key='batch', adjusted_basis='feat')
+            else: 
+                adata_omics1_high =  adata_omics1[:, adata_omics1.var['highly_variable']]
+                adata_omics1.obsm['feat'] = pca(adata_omics1_high, n_comps=adata_omics2.n_vars-1)# adata_omics2.n_vars-1
+                
+            if pred_joint:
+                test_idx = pd.read_csv(test_idx_name, header=None).values.flatten().astype(int)
+                y_pred = pd.read_csv(y_pred_name, header=0)
+                test_idx = test_idx[1:]
+                adata_omics2.X[test_idx] = y_pred.values
+
+            if batch:
+                sc.pp.pca(adata_omics2, use_highly_variable=True, n_comps=256)
+                sc.external.pp.harmony_integrate(adata_omics2, key='batch', adjusted_basis='feat')
+            else: 
+                sc.pp.highly_variable_genes(adata_omics2, flavor="seurat", n_top_genes=3000)
+                adata_omics2_high =  adata_omics2[:, adata_omics2.var['highly_variable']]
+                adata_omics2.obsm['feat'] = pca(adata_omics2_high, n_comps=256)
+
 
 
 
