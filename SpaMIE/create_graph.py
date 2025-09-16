@@ -4,7 +4,7 @@ import torch as th
 from SpaMIE.preprocess import preprocessing
 
 
-def Sagegraph(modalities, device, task="prediction", test_idx_name=None, y_pred_name=None, pred_joint=False, datatype='Stereo-CITE-seq', batch=False):
+def Sagegraph(modalities, device, task="Prediction", test_idx_name=None, y_pred_name=None, pred_joint=False, datatype='Stereo-CITE-seq', batch=False):
 
     adata_omics1 = modalities[0]
     adata_omics2 = modalities[1]
