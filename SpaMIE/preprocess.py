@@ -23,7 +23,7 @@ def preprocessing(adata_omics1, adata_omics2, task, test_idx_name, y_pred_name,
     fix_seed(random_seed)
     
     if datatype not in ['Stereo-CITE-seq','Stereo-CITE-seq_rna', 'Spatial_RNA_Epigenome','Spatial_Epigenome_RNA', 'mouseEmbryo', 'Spatial-epigenome-transcriptome-RNA-ATAC', 'Spatial-epigenome-transcriptome-ATAC-RNA', 'simu', 'spots']:
-      raise ValueError("The datatype is not supported now. SAGE supports 'Stereo-CITE-seq', 'Spatial-ATAC-RNA-seq'. We would extend SpatialGlue for more data types. ") 
+      raise ValueError("The datatype is not supported now. SAGE supports 'Stereo-CITE-seq', 'Spatial-ATAC-RNA-seq'. We would extend SpaMIE for more data types. ") 
      
     if task =='Prediction':
         if datatype == 'Stereo-CITE-seq':  
