@@ -1,5 +1,6 @@
 # SpaMIE：Spatial Multi-Omics Imputation and Embedding
 
+## Overview
 ![](https://github.com/xxdwdwd/SpaMIE/blob/main/overview.png)
 
 
