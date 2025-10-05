@@ -27,5 +27,6 @@ pip install -e .
 ```
 
 ## Tutorials
-We provide detailed tutorials on applying SpaMIE to various integration and imputation tasks.  
+We provide detailed tutorials on applying SpaMIE to various integration and imputation tasks.please refer to:
+[https://spamie-tutorials.readthedocs.io/en/latest/](https://spamie-tutorials.readthedocs.io/en/latest/)
 
